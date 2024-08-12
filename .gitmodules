@@ -1,0 +1,6 @@
+[submodule "lib/llvm-project"]
+	path = lib/llvm-project
+	url = git@github.com:llvm/llvm-project.git
+[submodule "lib/baco"]
+	path = lib/baco
+	url = https://github.com/baco-authors/baco.git

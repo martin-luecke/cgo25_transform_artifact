@@ -1,0 +1,269 @@
+From 446f3c398c8f1bb2988d3209f4ce1831830087bb Mon Sep 17 00:00:00 2001
+From: Alex Zinenko <zinenko@google.com>
+Date: Tue, 30 Apr 2024 15:51:20 +0000
+Subject: [PATCH 1/2] [mlir] dump pass manager as transform dialect
+
+---
+ mlir/include/mlir/Pass/Pass.h           |  3 ++
+ mlir/include/mlir/Pass/PassManager.h    |  2 +
+ mlir/lib/Pass/Pass.cpp                  | 56 +++++++++++++++++++++++++
+ mlir/lib/Tools/mlir-opt/MlirOptMain.cpp |  1 +
+ 4 files changed, 62 insertions(+)
+
+diff --git a/mlir/include/mlir/Pass/Pass.h b/mlir/include/mlir/Pass/Pass.h
+index e71c49a1687f..001d7bdc3c06 100644
+--- a/mlir/include/mlir/Pass/Pass.h
++++ b/mlir/include/mlir/Pass/Pass.h
+@@ -12,6 +12,7 @@
+ #include "mlir/IR/Action.h"
+ #include "mlir/Pass/AnalysisManager.h"
+ #include "mlir/Pass/PassRegistry.h"
++#include "mlir/Support/LLVM.h"
+ #include "mlir/Support/LogicalResult.h"
+ #include "llvm/ADT/PointerIntPair.h"
+ #include "llvm/ADT/Statistic.h"
+@@ -122,6 +123,8 @@ public:
+   /// an adaptor pass, print its pass managers.
+   void printAsTextualPipeline(raw_ostream &os);
+ 
++  void printAsTransformDialectScript(raw_ostream &os, int64_t &ssaNumber);
++
+   //===--------------------------------------------------------------------===//
+   // Statistics
+   //===--------------------------------------------------------------------===//
+diff --git a/mlir/include/mlir/Pass/PassManager.h b/mlir/include/mlir/Pass/PassManager.h
+index 1b2e6a3bc82b..0149c6f5e868 100644
+--- a/mlir/include/mlir/Pass/PassManager.h
++++ b/mlir/include/mlir/Pass/PassManager.h
+@@ -146,6 +146,8 @@ public:
+   /// Note: The quality of the string representation depends entirely on the
+   /// the correctness of per-pass overrides of Pass::printAsTextualPipeline.
+   void printAsTextualPipeline(raw_ostream &os) const;
++  void printAsTransformDialectScript(raw_ostream &os, int64_t &ssaNumber);
++  void printAsTransformDialectScript(raw_ostream &os);
+ 
+   /// Raw dump of the pass manager to llvm::errs().
+   void dump();
+diff --git a/mlir/lib/Pass/Pass.cpp b/mlir/lib/Pass/Pass.cpp
+index 57a6c20141d2..2d010cee0a9d 100644
+--- a/mlir/lib/Pass/Pass.cpp
++++ b/mlir/lib/Pass/Pass.cpp
+@@ -100,6 +100,31 @@ void Pass::printAsTextualPipeline(raw_ostream &os) {
+   passOptions.print(os);
+ }
+ 
++void Pass::printAsTransformDialectScript(raw_ostream &os, int64_t &ssaNumber) {
++  if (auto *adaptor = dyn_cast<OpToOpPassAdaptor>(this)) {
++    llvm::interleave(
++        adaptor->getPassManagers(),
++        [&](OpPassManager &pm) {
++          pm.printAsTransformDialectScript(os, ssaNumber);
++        },
++        [&] { os << ","; });
++    return;
++  }
++
++  os << "    %" << (ssaNumber + 1) << " = transform.apply_registered_pass \""
++     << getArgument() << "\" to %" << ssaNumber;
++
++  os << " {options = \"";
++  std::string options;
++  llvm::raw_string_ostream optionsOs(options);
++  passOptions.print(optionsOs);
++  os << llvm::StringRef(optionsOs.str()).trim(" \t\n{}");
++  os << "\"}";
++
++  os << " : (!transform.any_op) -> !transform.any_op\n";
++  ++ssaNumber;
++}
++
+ //===----------------------------------------------------------------------===//
+ // OpPassManagerImpl
+ //===----------------------------------------------------------------------===//
+@@ -388,6 +413,37 @@ StringRef OpPassManager::getOpAnchorName() const {
+   return impl->getOpAnchorName();
+ }
+ 
++void printAsTransformDialectScript(
++    raw_ostream &os, StringRef anchorName, int64_t &ssaNumber,
++    const llvm::iterator_range<OpPassManager::pass_iterator> &passes) {
++  if (anchorName != OpPassManager::getAnyOpAnchorName()) {
++    os << "    %" << (ssaNumber + 1) << " = transform.structured.match ops{[\""
++       << anchorName << "\"]}" << " in %" << ssaNumber
++       << " : (!transform.any_op) -> !transform.any_op\n";
++    ++ssaNumber;
++  }
++  for (auto &pass : passes) {
++    pass.printAsTransformDialectScript(os, ssaNumber);
++  }
++}
++void OpPassManager::printAsTransformDialectScript(raw_ostream &os,
++                                                  int64_t &ssaNumber) {
++  ::printAsTransformDialectScript(
++      os, getOpAnchorName(), ssaNumber,
++      {MutableArrayRef<std::unique_ptr<Pass>>{impl->passes}.begin(),
++       MutableArrayRef<std::unique_ptr<Pass>>{impl->passes}.end()});
++}
++void OpPassManager::printAsTransformDialectScript(raw_ostream &os) {
++  int64_t ssaNumber = 0;
++  os << "module attributes {transform.with_named_sequence} {\n";
++  os << "  transform.named_sequence @__transform_main(%0: !transform.any_op) "
++        "{\n";
++  printAsTransformDialectScript(os, ssaNumber);
++  os << "    transform.yield\n";
++  os << "  }\n";
++  os << "}\n\n";
++}
++
+ /// Prints out the passes of the pass manager as the textual representation
+ /// of pipelines.
+ void printAsTextualPipeline(
+diff --git a/mlir/lib/Tools/mlir-opt/MlirOptMain.cpp b/mlir/lib/Tools/mlir-opt/MlirOptMain.cpp
+index 44c5e9826f3b..989aa7186608 100644
+--- a/mlir/lib/Tools/mlir-opt/MlirOptMain.cpp
++++ b/mlir/lib/Tools/mlir-opt/MlirOptMain.cpp
+@@ -403,6 +403,7 @@ performActions(raw_ostream &os,
+   if (failed(config.setupPassPipeline(pm)))
+     return failure();
+ 
++  pm.printAsTransformDialectScript(llvm::errs());
+   // Run the pipeline.
+   if (failed(pm.run(*op)))
+     return failure();
+-- 
+2.39.3 (Apple Git-146)
+
+
+From 541903899cda3ded1a80bddc1e41d94916cb623e Mon Sep 17 00:00:00 2001
+From: Alex Zinenko <ftynse@gmail.com>
+Date: Mon, 13 May 2024 19:35:03 +0200
+Subject: [PATCH 2/2] properly handle pass manager nesting
+
+---
+ mlir/include/mlir/Pass/Pass.h        |  3 +-
+ mlir/include/mlir/Pass/PassManager.h |  3 +-
+ mlir/lib/Pass/Pass.cpp               | 41 ++++++++++++++++++----------
+ 3 files changed, 30 insertions(+), 17 deletions(-)
+
+diff --git a/mlir/include/mlir/Pass/Pass.h b/mlir/include/mlir/Pass/Pass.h
+index 001d7bdc3c06..b1e6b4306de7 100644
+--- a/mlir/include/mlir/Pass/Pass.h
++++ b/mlir/include/mlir/Pass/Pass.h
+@@ -123,7 +123,8 @@ public:
+   /// an adaptor pass, print its pass managers.
+   void printAsTextualPipeline(raw_ostream &os);
+ 
+-  void printAsTransformDialectScript(raw_ostream &os, int64_t &ssaNumber);
++  void printAsTransformDialectScript(raw_ostream &os, int64_t &ssaNumber,
++                                     int64_t &operandSsaNumber);
+ 
+   //===--------------------------------------------------------------------===//
+   // Statistics
+diff --git a/mlir/include/mlir/Pass/PassManager.h b/mlir/include/mlir/Pass/PassManager.h
+index 0149c6f5e868..00db9855494a 100644
+--- a/mlir/include/mlir/Pass/PassManager.h
++++ b/mlir/include/mlir/Pass/PassManager.h
+@@ -146,7 +146,8 @@ public:
+   /// Note: The quality of the string representation depends entirely on the
+   /// the correctness of per-pass overrides of Pass::printAsTextualPipeline.
+   void printAsTextualPipeline(raw_ostream &os) const;
+-  void printAsTransformDialectScript(raw_ostream &os, int64_t &ssaNumber);
++  void printAsTransformDialectScript(raw_ostream &os, int64_t &ssaNumber,
++                                     int64_t operandSsaNumber);
+   void printAsTransformDialectScript(raw_ostream &os);
+ 
+   /// Raw dump of the pass manager to llvm::errs().
+diff --git a/mlir/lib/Pass/Pass.cpp b/mlir/lib/Pass/Pass.cpp
+index 2d010cee0a9d..30b9f206f94b 100644
+--- a/mlir/lib/Pass/Pass.cpp
++++ b/mlir/lib/Pass/Pass.cpp
+@@ -100,29 +100,33 @@ void Pass::printAsTextualPipeline(raw_ostream &os) {
+   passOptions.print(os);
+ }
+ 
+-void Pass::printAsTransformDialectScript(raw_ostream &os, int64_t &ssaNumber) {
++void Pass::printAsTransformDialectScript(raw_ostream &os, int64_t &ssaNumber,
++                                         int64_t &operandSsaNumber) {
+   if (auto *adaptor = dyn_cast<OpToOpPassAdaptor>(this)) {
+     llvm::interleave(
+         adaptor->getPassManagers(),
+         [&](OpPassManager &pm) {
+-          pm.printAsTransformDialectScript(os, ssaNumber);
++          pm.printAsTransformDialectScript(os, ssaNumber, operandSsaNumber);
+         },
+-        [&] { os << ","; });
++        [&] { os << "\n    "; });
+     return;
+   }
+ 
+   os << "    %" << (ssaNumber + 1) << " = transform.apply_registered_pass \""
+-     << getArgument() << "\" to %" << ssaNumber;
++     << getArgument() << "\" to %" << operandSsaNumber;
+ 
+-  os << " {options = \"";
+   std::string options;
+   llvm::raw_string_ostream optionsOs(options);
+   passOptions.print(optionsOs);
+-  os << llvm::StringRef(optionsOs.str()).trim(" \t\n{}");
+-  os << "\"}";
++  optionsOs.flush();
++  if (!options.empty()) {
++    os << " {options = \"";
++    os << llvm::StringRef(options).trim(" \t\n{}");
++    os << "\"}";
++  }
+ 
+   os << " : (!transform.any_op) -> !transform.any_op\n";
+-  ++ssaNumber;
++  operandSsaNumber = ++ssaNumber;
+ }
+ 
+ //===----------------------------------------------------------------------===//
+@@ -415,30 +419,37 @@ StringRef OpPassManager::getOpAnchorName() const {
+ 
+ void printAsTransformDialectScript(
+     raw_ostream &os, StringRef anchorName, int64_t &ssaNumber,
++    int64_t operandSsaNumber,
+     const llvm::iterator_range<OpPassManager::pass_iterator> &passes) {
++  // TODO: need SSA number of the last module before entering the func.func,
++  // rather than the last produced by last func.func pass
++  int64_t localOperandSsaNumber = operandSsaNumber;
+   if (anchorName != OpPassManager::getAnyOpAnchorName()) {
+-    os << "    %" << (ssaNumber + 1) << " = transform.structured.match ops{[\""
+-       << anchorName << "\"]}" << " in %" << ssaNumber
++    os << "    %" << ++ssaNumber << " = transform.structured.match ops{[\""
++       << anchorName << "\"]}" << " in %" << operandSsaNumber
+        << " : (!transform.any_op) -> !transform.any_op\n";
+-    ++ssaNumber;
++    localOperandSsaNumber = ssaNumber;
+   }
+   for (auto &pass : passes) {
+-    pass.printAsTransformDialectScript(os, ssaNumber);
++    pass.printAsTransformDialectScript(os, ssaNumber, localOperandSsaNumber);
+   }
+ }
++
+ void OpPassManager::printAsTransformDialectScript(raw_ostream &os,
+-                                                  int64_t &ssaNumber) {
++                                                  int64_t &ssaNumber,
++                                                  int64_t operandSsaNumber) {
+   ::printAsTransformDialectScript(
+-      os, getOpAnchorName(), ssaNumber,
++      os, getOpAnchorName(), ssaNumber, operandSsaNumber,
+       {MutableArrayRef<std::unique_ptr<Pass>>{impl->passes}.begin(),
+        MutableArrayRef<std::unique_ptr<Pass>>{impl->passes}.end()});
+ }
++
+ void OpPassManager::printAsTransformDialectScript(raw_ostream &os) {
+   int64_t ssaNumber = 0;
+   os << "module attributes {transform.with_named_sequence} {\n";
+   os << "  transform.named_sequence @__transform_main(%0: !transform.any_op) "
+         "{\n";
+-  printAsTransformDialectScript(os, ssaNumber);
++  printAsTransformDialectScript(os, ssaNumber, ssaNumber);
+   os << "    transform.yield\n";
+   os << "  }\n";
+   os << "}\n\n";
+-- 
+2.39.3 (Apple Git-146)
+
