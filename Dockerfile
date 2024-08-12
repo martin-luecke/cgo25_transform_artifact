@@ -5,6 +5,7 @@ ENV LANG=C.UTF-8
 # install requirements
 RUN apt-get update && apt-get install -y software-properties-common
 RUN add-apt-repository ppa:deadsnakes/ppa
+
 RUN apt-get update && apt-get install -y \
   git \
   patch \
@@ -12,7 +13,12 @@ RUN apt-get update && apt-get install -y \
   cmake \
   lld \
   ninja-build \
-  python3.8 python3.8-venv python3.8-dev
+  python3.8 python3.8-venv python3.8-dev apt-transport-https curl gnupg
+
+RUN curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor >bazel-archive-keyring.gpg
+RUN sudo mv bazel-archive-keyring.gpg /usr/share/keyrings
+RUN echo "deb [arch=amd64 signed-by=/usr/share/keyrings/bazel-archive-keyring.gpg] https://storage.googleapis.com/bazel-apt stable jdk1.8" |  tee /etc/apt/sources.list.d/bazel.list
+RUN apt update && apt install bazel -y
 
 # copy libs
 COPY /lib /home/lib
@@ -39,3 +45,6 @@ RUN cmake --build build --target mlir-opt
 RUN cmake --build build --target mlir-transform-opt
 
 
+WORKDIR /Enzyme-JaX
+RUN bazel build -c opt :enzyme_ad && python -m pip install --upgrade --force-reinstall bazel-bin/enzyme_ad*.whl
+RUN python test/llama.py
