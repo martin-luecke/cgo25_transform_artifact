@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y \
   cmake \
   lld \
   ninja-build \
-  python3.8 python3.8-venv python3.8-dev apt-transport-https curl gnupg
+  python3.9 python3.9-venv python3.9-dev apt-transport-https curl gnupg
 
 RUN curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor >bazel-archive-keyring.gpg
 RUN mv bazel-archive-keyring.gpg /usr/share/keyrings
@@ -23,21 +23,22 @@ RUN apt update && apt install bazel-6.2.1 -y
 RUN git clone https://github.com/EnzymeAD/Enzyme-JaX 
 WORKDIR /Enzyme-JaX
 RUN git checkout 01d840ae99c5e185ee4e532c19fa2b4b9e4fdd8d
-RUN bazel-6.2.1 build -c opt :enzyme_ad
-RUN python3.8 -m pip install --upgrade --force-reinstall bazel-bin/enzyme_ad*.whl
-RUN python3.8 test/llama.py
+RUN HERMETIC_PYTHON_VERSION=3.9 bazel-6.2.1 build -c opt :enzyme_ad
+
+# Set up Python environment
+ENV VIRTUAL_ENV=/home/.venv
+RUN python3.9 -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+RUN pip install --upgrade pip
+
+RUN python3.9 -m pip install --upgrade --force-reinstall bazel-bin/enzyme_ad*.whl
+RUN python3.9 test/llama.py
 
 # copy libs
 COPY /lib /home/lib
 COPY /patches /home/patches
 
-# Set up Python environment
-ENV VIRTUAL_ENV=/home/.venv
-RUN python3.8 -m venv $VIRTUAL_ENV
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-
 # Install Baco
-RUN pip install --upgrade pip
 WORKDIR /home/lib/baco
 RUN pip install -e /home/lib/baco
 
