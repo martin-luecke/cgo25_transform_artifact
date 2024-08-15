@@ -68,7 +68,6 @@ RUN apt-get update && apt-get install -y \
   # Set zsh as the default shell
   RUN chsh -s $(which zsh)
   
-  
   RUN apt-get install -y pkg-config libhdf5-dev
   RUN pip install optimum[exporters-tf] tf-keras
   
@@ -76,5 +75,5 @@ RUN apt-get update && apt-get install -y \
   COPY /patches /home/patches
   COPY /scripts /home/scripts
   RUN mkdir /home/models
-  
+  RUN mkdir /home/results  
 
