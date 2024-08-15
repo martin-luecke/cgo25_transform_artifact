@@ -16,9 +16,16 @@ RUN apt-get update && apt-get install -y \
   python3.8 python3.8-venv python3.8-dev apt-transport-https curl gnupg
 
 RUN curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor >bazel-archive-keyring.gpg
-RUN sudo mv bazel-archive-keyring.gpg /usr/share/keyrings
+RUN mv bazel-archive-keyring.gpg /usr/share/keyrings
 RUN echo "deb [arch=amd64 signed-by=/usr/share/keyrings/bazel-archive-keyring.gpg] https://storage.googleapis.com/bazel-apt stable jdk1.8" |  tee /etc/apt/sources.list.d/bazel.list
-RUN apt update && apt install bazel -y
+RUN apt update && apt install bazel-6.2.1 -y
+
+RUN git clone https://github.com/EnzymeAD/Enzyme-JaX 
+WORKDIR /Enzyme-JaX
+RUN git checkout 01d840ae99c5e185ee4e532c19fa2b4b9e4fdd8d
+RUN bazel-6.2.1 build -c opt :enzyme_ad
+RUN python3.8 -m pip install --upgrade --force-reinstall bazel-bin/enzyme_ad*.whl
+RUN python3.8 test/llama.py
 
 # copy libs
 COPY /lib /home/lib
@@ -44,7 +51,3 @@ RUN cmake -S llvm -B build -G Ninja -DLLVM_ENABLE_PROJECTS='mlir' -DCMAKE_BUILD_
 RUN cmake --build build --target mlir-opt
 RUN cmake --build build --target mlir-transform-opt
 
-
-WORKDIR /Enzyme-JaX
-RUN bazel build -c opt :enzyme_ad && python -m pip install --upgrade --force-reinstall bazel-bin/enzyme_ad*.whl
-RUN python test/llama.py
