@@ -4,6 +4,8 @@ This repository presents the artifact to supplement the CGO 2025 paper "The MLIR
 It includes the MLIR infrastructure with the Transform dialect and corresponding passes. 
 A dockerfile and scripts are provided to enable easy installation, execution, and examination of results.
 
+Prerequisites: installed Docker and GNU make available in `$PATH`.
+
 ## TL;DR
 ```bash
 systemctl start docker
