@@ -1,7 +1,7 @@
 # Artifact for the paper "The MLIR Transform Dialect - Your compiler is more powerful than you think"
 
 This repository presents the artifact to supplement the CGO 2025 paper "The MLIR Transform Dialect - Your compiler is more powerful than you think".
-It includes the MLIR infrastructure with the \Rise dialect and corresponding passes. 
+It includes the MLIR infrastructure with the Transform dialect and corresponding passes. 
 A dockerfile and scripts are provided to enable easy installation, execution, and examination of results.
 
 ## TL;DR
