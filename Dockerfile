@@ -22,7 +22,7 @@ RUN apt update && apt install bazel-6.2.1 -y
 
 RUN git clone https://github.com/EnzymeAD/Enzyme-JaX 
 WORKDIR /Enzyme-JaX
-RUN git checkout be7a7c42d6ad4d3e160756e1f41e21d88fad15c2
+RUN git checkout fd3d89f57661a11299e31d61cbefdae959bb2599
 RUN HERMETIC_PYTHON_VERSION=3.9 bazel-6.2.1 build -c opt :enzyme_ad
 
 # Set up Python environment
