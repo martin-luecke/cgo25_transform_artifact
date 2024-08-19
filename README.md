@@ -88,6 +88,8 @@ The experiment performs reverse-mode automatic differentiation of unbatched LLam
 
 The subset of patterns applied in the third case is visible in the `jax.jit` command starting around line 440 of `Enzyme-JaX/test/llama.py`. Removing some of these patterns may further modify the runtime reported for the third case. Removing all of them is expected to yield the same runtime as the first case as no additional patterns will be applied. Furthermore, the `unused` variable defined around line 549 of the same file contains the patterns that were excluded from the subset. Adding these back into the list is expected to yield the same runtime as the second case as all patterns will be applied.
 
+One can connect to the previously connected Docker container using `docker run -it <container-id>` to avoid time-consuming recompilation and rebuild. The `Enzyme-JaX` directory is located directly under `/`.
+
 #### 4.4 - Case Study 4: Fine-Grained Control of Performance Optimizations
 ##### Expected Results
 ##### Customizing the Experiment
