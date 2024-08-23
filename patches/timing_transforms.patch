@@ -1,0 +1,30 @@
+diff --git a/mlir/examples/transform-opt/mlir-transform-opt.cpp b/mlir/examples/transform-opt/mlir-transform-opt.cpp
+index 41a17f18726b..b429a7534a7e 100644
+--- a/mlir/examples/transform-opt/mlir-transform-opt.cpp
++++ b/mlir/examples/transform-opt/mlir-transform-opt.cpp
+@@ -24,6 +24,8 @@
+ #include "llvm/Support/InitLLVM.h"
+ #include "llvm/Support/SourceMgr.h"
+ #include "llvm/Support/ToolOutputFile.h"
++#include "llvm/Support/raw_ostream.h"
++#include <chrono>
+ #include <cstdlib>
+ 
+ namespace {
+@@ -226,8 +228,14 @@ static mlir::LogicalResult
+ applyTransforms(mlir::Operation *payloadRoot,
+                 mlir::transform::TransformOpInterface transformRoot,
+                 const mlir::transform::TransformOptions &options) {
+-  return applyTransforms(payloadRoot, transformRoot, {}, options,
+-                         /*enforceToplevelTransformOp=*/false);
++  llvm::errs() << "Applying transforms\n";
++  auto start = std::chrono::high_resolution_clock::now();
++  auto result = applyTransforms(payloadRoot, transformRoot, {}, options,
++                                /*enforceToplevelTransformOp=*/false);
++  auto end = std::chrono::high_resolution_clock::now();
++  std::chrono::duration<double> diff = end - start;
++  llvm::errs() << "Time taken: " << diff.count() << " seconds.\n";
++  return result;
+ }
+ 
+ /// Applies transforms indicated in the transform dialect script to the input

@@ -1,0 +1,46 @@
+diff --git a/mlir/lib/Tools/mlir-opt/MlirOptMain.cpp b/mlir/lib/Tools/mlir-opt/MlirOptMain.cpp
+index 989aa7186608..62df374ebf2d 100644
+--- a/mlir/lib/Tools/mlir-opt/MlirOptMain.cpp
++++ b/mlir/lib/Tools/mlir-opt/MlirOptMain.cpp
+@@ -48,6 +48,7 @@
+ #include "llvm/Support/StringSaver.h"
+ #include "llvm/Support/ThreadPool.h"
+ #include "llvm/Support/ToolOutputFile.h"
++#include <chrono>
+ 
+ using namespace mlir;
+ using namespace llvm;
+@@ -129,7 +130,8 @@ struct MlirOptMainConfigCLOptions : public MlirOptMainConfig {
+         cl::location(showDialectsFlag), cl::init(false));
+ 
+     static cl::opt<std::string, /*ExternalStorage=*/true> splitInputFile{
+-        "split-input-file", llvm::cl::ValueOptional,
++        "split-input-file",
++        llvm::cl::ValueOptional,
+         cl::callback([&](const std::string &str) {
+           // Implicit value: use default marker if flag was used without value.
+           if (str.empty())
+@@ -137,7 +139,8 @@ struct MlirOptMainConfigCLOptions : public MlirOptMainConfig {
+         }),
+         cl::desc("Split the input file into chunks using the given or "
+                  "default marker and process each chunk independently"),
+-        cl::location(splitInputFileFlag), cl::init("")};
++        cl::location(splitInputFileFlag),
++        cl::init("")};
+ 
+     static cl::opt<std::string, /*ExternalStorage=*/true> outputSplitMarker(
+         "output-split-marker",
+@@ -405,8 +408,13 @@ performActions(raw_ostream &os,
+ 
+   pm.printAsTransformDialectScript(llvm::errs());
+   // Run the pipeline.
++  llvm::errs() << "Applying mlir passes\n";
++  auto start = std::chrono::high_resolution_clock::now();
+   if (failed(pm.run(*op)))
+     return failure();
++  auto end = std::chrono::high_resolution_clock::now();
++  std::chrono::duration<double> diff = end - start;
++  llvm::errs() << "Time taken: " << diff.count() << " seconds.\n";
+ 
+   // Generate reproducers if requested
+   if (!config.getReproducerFilename().empty()) {
