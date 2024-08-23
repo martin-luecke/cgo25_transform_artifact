@@ -1,0 +1,74 @@
+{
+    "application_name": "batch_matmul",
+    "design_of_experiment": {
+        "doe_type": "random sampling",
+        "number_of_samples": 10
+    },
+    "optimization_iterations": 200,
+    "log_file" : "/home/results/logs/performance_exploration.log",
+    "output_data_file" : "/home/results/performance_exploration.csv",
+    "optimization_objectives": [
+        "runtime"
+    ],
+    "feasible_output": {
+        "enable_feasible_predictor": true,
+        "name": "Valid",
+        "true_value": "1",
+        "false_value": "0"
+    },
+    "input_parameters": {
+        "tile0": {
+            "parameter_type": "integer",
+            "values": [
+                0,
+                6
+            ],
+            "constraints": [
+                "(6 % tile0 == 0) | (tile0 == 0)"
+            ]
+        },
+        "tile1": {
+            "parameter_type": "integer",
+            "values": [
+                0,
+                196
+            ],
+            "constraints": [
+                "(196 % tile1 == 0) | (tile1 == 0)"
+            ]
+        },
+        "tile2": {
+            "parameter_type": "integer",
+            "values": [
+                0,
+                256
+            ],
+            "constraints": [
+                "(256 % tile2 == 0) | (tile2 == 0)"
+            ]
+        },
+        "tile3": {
+            "parameter_type": "integer",
+            "values": [
+                0,
+                2304
+            ],
+            "constraints": [
+                "(2304 % tile3 == 0) | (tile3 == 0)"
+            ]
+        },
+        "do_vect": {
+            "parameter_type": "integer",
+            "dependencies": [
+                "tile3"
+            ],
+            "values": [
+                0,
+                1
+            ],
+            "constraints": [
+                "where(tile3 % 4 != 0, do_vect == 0, True)"
+            ]
+        }
+    }
+}
