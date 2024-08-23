@@ -7,3 +7,6 @@
 [submodule "lib/tensorflow"]
 	path = lib/tensorflow
 	url = https://github.com/tensorflow/tensorflow.git
+[submodule "lib/libxsmm"]
+	path = lib/libxsmm
+	url = git@github.com:libxsmm/libxsmm.git
