@@ -68,7 +68,7 @@ RUN pip install -r /home/lib/llvm-project/mlir/python/requirements.txt
 
 # Compile MLIR
 WORKDIR /home/lib/llvm-project
-RUN patch /home/patches/dump_transform_script_from_mlir.patch
+RUN patch -p1 < /home/patches/dump_transform_script_from_mlir.patch
 RUN patch -p1 < /home/patches/timing_mlir_opt.patch
 RUN patch -p1 < /home/patches/timing_transforms.patch
 RUN cmake -S llvm -B build -G Ninja -DLLVM_ENABLE_PROJECTS='mlir' -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=clang-18 -DCMAKE_CXX_COMPILER=clang++-18 -DLLVM_PARALLEL_COMPILE_JOBS=10 -DLLVM_PARALLEL_LINK_JOBS=10 -DLLVM_ENABLE_LLD=ON -DMLIR_ENABLE_BINDINGS_PYTHON=ON -DPython3_EXECUTABLE='$VIRTUAL_ENV/bin/python'
