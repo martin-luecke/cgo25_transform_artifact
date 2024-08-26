@@ -2,19 +2,15 @@ cmake_minimum_required(VERSION 3.10)
 # Set your compiler
 set(CMAKE_C_COMPILER clang-18)
 
-# Include directories
-include_directories(/home/lib/libxsmm/include)
-
 # Paths
 set(MLIR_PATH /home/lib/llvm-project/build)
 set(MLIR_LIB_PATH ${MLIR_PATH}/lib)
-set(LIBXSMM_LIB_PATH /home/lib/libxsmm/lib)
 
 # Compilation flags
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffp-contract=off -fopenmp -fopenmp-extensions -I/usr/lib/llvm-18/lib/clang/18/include -Wall -O3 -fPIC")
 
 # Linker flags
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fopenmp -L/usr/lib/llvm-18/lib -L${MLIR_LIB_PATH} -lmlir_runner_utils -lmlir_c_runner_utils -L${LIBXSMM_LIB_PATH} -lxsmm -lblas -Wl,-rpath,${MLIR_LIB_PATH}")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fopenmp -L/usr/lib/llvm-18/lib -L${MLIR_LIB_PATH} -lmlir_runner_utils -lmlir_c_runner_utils -lblas -Wl,-rpath,${MLIR_LIB_PATH}")
 
 # Define a function to add targets with custom commands
 function(add_mlir_target target_name source_c source_mlir)

@@ -26,7 +26,6 @@ RUN apt-get update && apt-get install -y \
 COPY /lib/baco /home/lib/baco
 COPY /lib/llvm-project /home/lib/llvm-project
 COPY /lib/tensorflow /home/lib/tensorflow
-COPY /lib/libxsmm /home/lib/libxsmm
 
 COPY /patches /home/patches
 
@@ -35,7 +34,7 @@ RUN ln -s /usr/bin/clang-18 /usr/bin/clang && \
 ln -s /usr/bin/clang++-18 /usr/bin/clang++
 
 # Install Bazelisk
-RUN curl -L https://github.com/bazelbuild/bazelisk/releases/download/v1.20.0/bazelisk-linux-arm64 -o /usr/local/bin/bazelisk && \
+RUN curl -L https://github.com/bazelbuild/bazelisk/releases/download/v1.20.0/bazelisk-linux-amd64 -o /usr/local/bin/bazelisk && \
 chmod +x /usr/local/bin/bazelisk
 
 # Set up Python3.9 environment for Enzyme only
@@ -45,10 +44,11 @@ RUN python3.9 -m venv $VIRTUAL_ENV39
 # Install Enzyme
 ENV CC=clang-18
 ENV CXX=clang-18++
+ENV HERMETIC_PYTHON_VERSION=3.9
 WORKDIR /home/lib/Enzyme-JaX
 RUN git clone https://github.com/EnzymeAD/Enzyme-JaX /home/lib/Enzyme-JaX
 RUN git checkout fd3d89f57661a11299e31d61cbefdae959bb2599
-RUN . $VIRTUAL_ENV39/bin/activate && HERMETIC_PYTHON_VERSION=3.9 bazelisk build -c opt :enzyme_ad
+RUN . $VIRTUAL_ENV39/bin/activate && bazelisk build -c opt :enzyme_ad
 RUN . $VIRTUAL_ENV39/bin/activate && python3.9 -m pip install --upgrade --force-reinstall bazel-bin/enzyme_ad*.whl
 RUN . $VIRTUAL_ENV39/bin/activate && python3.9 test/llama.py
 
@@ -62,12 +62,6 @@ RUN pip install optimum[exporters-tf] tf-keras
 RUN pip install --upgrade pip
 WORKDIR /home/lib/baco
 RUN pip install -e /home/lib/baco
-
-# Install libxsmm
-WORKDIR /home/lib/libxsmm
-RUN make -j
-ENV LIBXSMM_DIR=/home/lib/libxsmm
-ENV LD_LIBRARY_PATH=$LIBXSMM_DIR/lib:$LD_LIBRARY_PATH
 
 # MLIR Python bindings prerequisites
 RUN pip install -r /home/lib/llvm-project/mlir/python/requirements.txt

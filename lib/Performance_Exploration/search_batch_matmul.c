@@ -4,10 +4,6 @@
 #include <assert.h>
 #include <time.h>
 #include <stdbool.h>
-#include <libxsmm_source.h>
-#include <libxsmm_utils.h>
-
-#include <libxsmm.h>
 
 // #define DEBUG
 #define REPS 15
@@ -32,81 +28,8 @@ DTYPE *mat_mult(const int m, const int n, const int k,
                 const DTYPE *b, const int ldb,
                       DTYPE *c, const int ldc);
 
-// void *libxsmm_wrapper(MemRefDescriptor *a, MemRefDescriptor *b, MemRefDescriptor *c, int m, int n, int k);
 extern void _mlir_ciface_matmul_mlir(MemRefDescriptor* arg1, MemRefDescriptor* arg2, MemRefDescriptor* arg3);
 extern void _mlir_ciface_print(MemRefDescriptor* arg1);
-void print_gemm_descriptor(const libxsmm_gemm_descriptor* desc) {
-    printf("m=%d, n=%d, k=%d, lda=%d, ldb=%d, ldc=%d, flags=%d, prefetch=%d\n",
-           desc->m, desc->n, desc->k, desc->lda, desc->ldb, desc->ldc,
-        desc->flags, desc->prefetch);
-}
-
-
-libxsmm_xmmfunction get_libsxmm_kernel(int m, int n, int k, int lda, int ldb, int ldc) {
-    libxsmm_descriptor_blob blob;
-    const libxsmm_gemm_descriptor* gemm_descriptor = libxsmm_gemm_descriptor_init(
-        &blob,
-        LIBXSMM_DATATYPE_F32,
-        LIBXSMM_DATATYPE_F32,
-        LIBXSMM_DATATYPE_F32,
-        LIBXSMM_DATATYPE_F32,
-        m, n, k, lda, ldb, ldc,
-        LIBXSMM_GEMM_FLAGS(LIBXSMM_GEMM_FLAG_TRANS_A,LIBXSMM_GEMM_FLAG_TRANS_B),
-        LIBXSMM_GEMM_PREFETCH_NONE);
-    libxsmm_xmmfunction gemm_kernel = libxsmm_xmmdispatch(gemm_descriptor);
-    if (NULL == gemm_kernel.smm) {
-        fprintf(stderr, "Failed to dispatch the GEMM kernel.\n");
-    }
-    print_gemm_descriptor(gemm_descriptor);
-    return gemm_kernel;
-}
-
-libxsmm_xmmfunction _mlir_ciface_libsxmm_smm(MemRefDescriptor *a, MemRefDescriptor *b, MemRefDescriptor *c) {
-    // printf("mlir called me!\n");
-    libxsmm_blasint m = a->sizes[0];
-    libxsmm_blasint n = b->sizes[1];
-    libxsmm_blasint k = a->sizes[1];
-
-    libxsmm_blasint lda = a->strides[0];
-    libxsmm_blasint ldb = b->strides[0];
-    libxsmm_blasint ldc = c->strides[0];
-    libxsmm_descriptor_blob blob;
-    const libxsmm_gemm_descriptor* gemm_descriptor = libxsmm_gemm_descriptor_init(
-        &blob,
-        LIBXSMM_DATATYPE_F32,
-        LIBXSMM_DATATYPE_F32,
-        LIBXSMM_DATATYPE_F32,
-        LIBXSMM_DATATYPE_F32,
-        m, n, k, lda, ldb, ldc,
-        LIBXSMM_GEMM_FLAGS(LIBXSMM_GEMM_FLAG_TRANS_A,LIBXSMM_GEMM_FLAG_TRANS_B),
-        LIBXSMM_GEMM_PREFETCH_NONE);
-    libxsmm_xmmfunction gemm_kernel = libxsmm_xmmdispatch(gemm_descriptor);
-    if (NULL == gemm_kernel.smm) {
-        fprintf(stderr, "Failed to dispatch the GEMM kernel.\n");
-    }
-    // print_gemm_descriptor(gemm_descriptor);
-    gemm_kernel.smm(a->aligned, b->aligned, c->aligned);
-    // _mlir_ciface_print(c);
-}
-
-void libxsmm_gemm_wrapper(MemRefDescriptor *a, MemRefDescriptor *b, MemRefDescriptor *c) {
-    // Create LIBXSMM descriptors for input matrices
-    libxsmm_blasint m = a->sizes[0];
-    libxsmm_blasint n = b->sizes[1];
-    libxsmm_blasint k = a->sizes[1];
-
-    libxsmm_blasint lda = a->strides[0];
-    libxsmm_blasint ldb = b->strides[0];
-    libxsmm_blasint ldc = c->strides[0];
-    libxsmm_descriptor_blob blob;
-
-    const libxsmm_gemm_descriptor* gemm_descriptor = libxsmm_gemm_descriptor_init(&blob, LIBXSMM_DATATYPE_F32, LIBXSMM_DATATYPE_F32, LIBXSMM_DATATYPE_F32, LIBXSMM_DATATYPE_F32, m, n, k, lda, ldb, ldc, LIBXSMM_GEMM_FLAG_NONE, LIBXSMM_GEMM_PREFETCH_NONE);
-    libxsmm_xmmfunction gemm_kernel = libxsmm_xmmdispatch(gemm_descriptor);
-    if (NULL == gemm_kernel.smm) {
-        fprintf(stderr, "Failed to dispatch the GEMM kernel.\n");
-    }
-    print_gemm_descriptor(gemm_descriptor);
-}
 
 MemRefDescriptor get_memref(DTYPE *mem, int b, int m, int n, int lda) {
     MemRefDescriptor descriptor;
@@ -311,11 +234,3 @@ int main(int argc, char *argv[])
 
     return 0;
 }
-
-// OpenMP times 6x196x256x2304, 15 Reps:
-// Min time: 2.056248 second(s)
-// Max time: 2.195571 second(s)
-// Average time: 2.123381 second(s)
-// Median time: 2.119320 second(s)
-// Standard deviation: 0.036262 second(s)
-//
