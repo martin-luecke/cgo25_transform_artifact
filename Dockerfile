@@ -89,6 +89,7 @@ COPY /lib/Performance_Exploration /home/lib/Performance_Exploration
 
 WORKDIR /home/lib/Performance_Exploration
 RUN pip install -r requirements.txt
+RUN pip install psutil
 WORKDIR /home/lib/Performance_Exploration/build
 RUN cmake .. -DCMAKE_C_COMPILER=clang-18 -DCMAKE_CXX_COMPILER=clang++-18
 RUN make batch_matmul

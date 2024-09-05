@@ -19,12 +19,13 @@ function(add_mlir_target target_name source_c source_mlir)
 	set(MLIR_LL "${CMAKE_CURRENT_BINARY_DIR}/${target_name}.mlir.ll")
 	set(MLIR_TMP_LL "${CMAKE_CURRENT_BINARY_DIR}/${target_name}_tmp.llvm.mlir")
 	set(MLIR_LLVM_MLIR "${CMAKE_CURRENT_BINARY_DIR}/${target_name}.llvm.mlir")
-
 	add_executable(${target_name} ${source_c} ${LLVM_OBJ})
+	
+	set(TIMEOUT 20)  # Set the timeout in seconds
 
 	add_custom_command(
 		OUTPUT ${LLVM_OBJ}
-		COMMAND ${CMAKE_C_COMPILER} -O3 -c ${MLIR_LL} -o ${LLVM_OBJ}
+		COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/run_with_timeout.py ${TIMEOUT} ${CMAKE_C_COMPILER} -O3 -c ${MLIR_LL} -o ${LLVM_OBJ}
 		DEPENDS ${MLIR_LL}
 		COMMENT "Converting ${MLIR_LL} to ${LLVM_OBJ}"
 	)
@@ -50,7 +51,6 @@ function(add_mlir_target target_name source_c source_mlir)
 		COMMENT "Running mlir-opt on ${MLIR_TMP_LL}"
 	)
 
-	set(TIMEOUT 20)  # Set the timeout in seconds
 
 	add_custom_command(
 		OUTPUT ${MLIR_TMP_LL}
